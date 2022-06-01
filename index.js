@@ -111,60 +111,19 @@ function createTimeOutEvent(dateStamp) {
 function hoursWorkedOnDate(dateStamp) {
   console.log("________________________________________");
   console.log("Inside hoursWorkedOnDate() function: ");
-  // The two issue: that I see in terms of edge cases is the following:
-  // 1. For each time in event, there is a corresponding time out event
-  // Therefore, the easiest way to think about this is to literally have a loop
-  // variable 'i' to account for this scenario across both loops
 
-  console.log("dateStamp: ", dateStamp);
-
-  console.log("this: ", this);
-
-  let timeEventsArrayLength = this["timeInEvents"].length;
-  // NOTE:
-  // Here I am accounting for the weird edge case where there are multiple
-  // time in and time out events for a single person, so I will add all of these
-  // hours together into the 'totalHoursWorkedArray' array, and just return
-  // the hours worked accordingly:
-  let totalHoursWorkedArray = [];
-  let totalHoursWorked = 0;
-
-  console.log("timeEventsArrayLength", timeEventsArrayLength);
-
-  for (let i = 0; i < timeEventsArrayLength; i++) {
-    console.log("i: ", i);
-
-    let timeInHour = this["timeInEvents"][i]["hour"];
-    let timeOutHour = this["timeOutEvents"][i]["hour"];
-    let timeDifference = timeOutHour - timeInHour;
-
-    console.log("timeInHour: ", timeInHour);
-    console.log("timeHourHour: ", timeOutHour);
-    console.log("timeDifference: ", timeDifference);
-
-    timeDifference = timeDifference.toString();
-
-    if (timeDifference.length > 2) {
-      // Slice off everything but the last two zeros:
-      timeDifference = timeDifference.slice(0, timeDifference.length - 2);
-    }
-
-    let hoursWorked = parseInt(timeDifference, 10);
-
-    totalHoursWorkedArray.push(hoursWorked);
-  }
-
-  // Here we are cycling through the array of hour differences that were obtained
-  // so that we can sum them up later, which is super useful for the edge case
-  // involving multiple time stamps for an individual on a single day:
-  totalHoursWorkedArray.forEach((value) => {
-    console.log("value: ", value);
-      totalHoursWorked += value;
+  let inEvent = this.timeInEvents.find((e) => {
+    return e.date === dateStamp;
   });
 
-  console.log("totalHoursWorked: ", totalHoursWorked);
+  let outEvent = this.timeOutEvents.find((e) => {
+    return e.date === dateStamp;
+  });
 
-  return totalHoursWorked;
+  console.log("inEvent: ", inEvent);
+  console.log("outEvent: ", outEvent);
+
+  return (outEvent.hour - inEvent.hour) / 100;
 }
 
 function wagesEarnedOnDate(dateStamp) {
@@ -177,7 +136,7 @@ function wagesEarnedOnDate(dateStamp) {
 
   // NOTE: This is the 'gotcha', since you ALSO need to use .call() within the
   // function itself so that I can pass in the object accordingly:
-  let hoursWorked = hoursWorkedOnDate.call(this);
+  let hoursWorked = hoursWorkedOnDate.call(this, dateStamp);
   let payPerHour = this["payPerHour"];
   let wagesEarned = hoursWorked * payPerHour;
 
@@ -206,6 +165,7 @@ const allWagesFor = function () {
     return e.date;
   });
 
+  console.log("eligibleDates: ", eligibleDates);
 
   // MDN for .reduce():
   // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce
@@ -213,8 +173,46 @@ const allWagesFor = function () {
     return memo + wagesEarnedOnDate.call(this, d);
   }.bind(this), 0); // <== Hm, why did we need to add bind() there? We'll discuss soon!
 
+  console.log("payable: ", payable);
+
   return payable;
 };
+
+function findEmployeeByFirstName(recordArray, firstName) {
+  console.log("________________________________________");
+  console.log("Inside findEmployeeByFirstName() function");
+  console.log("this: ", this);
+
+  let employeeMatch = recordArray.find((e) => {
+    console.log("e: ", e);
+
+    return e.firstName === firstName;
+  });
+
+  console.log("employeeMatch: ", employeeMatch);
+
+  return employeeMatch;
+}
+
+function calculatePayroll(recordArray) {
+  console.log("________________________________________");
+  console.log("Inside calculatePayroll() function");
+  console.log("recordArray: ", recordArray);
+  let totalPayroll = 0;
+  recordArray.forEach((record) => {
+    console.log("record: ", record);
+    // NOTE:
+    // I had to use .call() here because it wasn't passing in the 'this' object properly without it:
+    let employeeWages = allWagesFor.call(record);
+    console.log("employeeWages: ", employeeWages);
+    totalPayroll += employeeWages;
+    console.log("totalPayroll (at the end of current loop iteration): ", totalPayroll);
+  });
+
+  console.log("totalPayroll (at the end of the calculatePayroll() function): ", totalPayroll);
+
+  return totalPayroll;
+}
 
 // TESTING SECTION:
 console.log("________________________________________");
@@ -301,8 +299,69 @@ rTimeData.forEach(function (d, i) {
   createTimeOutEvent.call(rRecord, dOut);
 });
 
-// TODO:
-// Figure out why the math is just not adding up for this edge case:
 let grandTotalOwed = [sRecord, rRecord].reduce((m, e) => m + allWagesFor.call(e), 0);
 console.log("grandTotalOwed: ", grandTotalOwed);
-// expect(grandTotalOwed).to.equal(770)
+
+console.log("________________________________________");
+console.log("Testing findEmployeeByFirstName() function: ");
+
+let src = [
+  ["Loki", "Laufeysson-Odinsson", "HR Representative", 35],
+  ["Natalia", "Romanov", "CEO", 150]
+];
+
+let emps = createEmployeeRecords(src);
+let loki = findEmployeeByFirstName(emps, "Loki");
+console.log("loki.familyName: ", loki.familyName);
+
+console.log("________________________________________");
+console.log("Testing calculatePayroll() function: ");
+const csvDataEmployees = [
+  ["Thor", "Odinsson", "Electrical Engineer", 45],
+  ["Loki", "Laufeysson-Odinsson", "HR Representative", 35],
+  ["Natalia", "Romanov", "CEO", 150],
+  ["Darcey", "Lewis", "Intern", 15],
+  ["Jarvis", "Stark", "CIO", 125],
+  ["Anthony", "Stark", "Angel Investor", 300]
+];
+
+const csvTimesIn = [
+  ["Thor", ["2018-01-01 0800", "2018-01-02 0800", "2018-01-03 0800"]],
+  ["Loki", ["2018-01-01 0700", "2018-01-02 0700", "2018-01-03 0600"]],
+  ["Natalia", ["2018-01-03 1700", "2018-01-05 1800", "2018-01-03 1300"]],
+  ["Darcey", ["2018-01-01 0700", "2018-01-02 0800", "2018-01-03 0800"]],
+  ["Jarvis", ["2018-01-01 0500", "2018-01-02 0500", "2018-01-03 0500"]],
+  ["Anthony", ["2018-01-01 1400", "2018-01-02 1400", "2018-01-03 1400"]]
+];
+
+const csvTimesOut = [
+  ["Thor", ["2018-01-01 1600", "2018-01-02 1800", "2018-01-03 1800"]],
+  ["Loki", ["2018-01-01 1700", "2018-01-02 1800", "2018-01-03 1800"]],
+  ["Natalia", ["2018-01-03 2300", "2018-01-05 2300", "2018-01-03 2300"]],
+  ["Darcey", ["2018-01-01 1300", "2018-01-02 1300", "2018-01-03 1300"]],
+  ["Jarvis", ["2018-01-01 1800", "2018-01-02 1800", "2018-01-03 1800"]],
+  ["Anthony", ["2018-01-01 1600", "2018-01-02 1600", "2018-01-03 1600"]]
+];
+
+let employeeRecords = createEmployeeRecords(csvDataEmployees);
+
+employeeRecords.forEach(function (rec) {
+  let timesInRecordRow = csvTimesIn.find(function (row) {
+    return rec.firstName === row[0];
+  });
+
+  let timesOutRecordRow = csvTimesOut.find(function (row) {
+    return rec.firstName === row[0];
+  });
+
+  timesInRecordRow[1].forEach(function(timeInStamp){
+    createTimeInEvent.call(rec, timeInStamp);
+  });
+
+  timesOutRecordRow[1].forEach(function(timeOutStamp){
+    createTimeOutEvent.call(rec, timeOutStamp);
+  });
+});
+
+let totalPayroll = calculatePayroll(employeeRecords);
+console.log("totalPayroll: ", totalPayroll);
